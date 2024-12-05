@@ -1,8 +1,22 @@
 import numpy as np
 from tkinter import *
+from tkinter import ttk
+
+
+def callback_float(P):
+    # It doesn't work for floats with the commented code below. It won't take decimal points
+    if P == "":
+        return True
+    else:
+        try:
+            float(P)
+            return True
+        except ValueError:
+            return False
 
 class ToolSelection(Frame):
     selected = "mouse"
+
     def __init__(self, parent, canvas_label, *args, **kwargs):
         # super() didn't work in place of Frame.
         # AttributeError: 'ToolSelection' object has no attribute 'tk'
@@ -55,6 +69,60 @@ class ToolSelection(Frame):
         print(self.canvas_StrVar)
 
 
+class ShapeConfig(Frame):
+    fill_color = "red"
+    outline_color = "black"
+    line_width = 1
+    def __init__(self, parent, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.parent = parent
+
+        self.configure(bg='blue')
+        self.grid(row=4, column=0, padx=10, pady=10)
+
+        color_list = ["black", "white", "red", "yellow", "green", "blue", "indigo", "violet"]
+
+        self.fill_color_cbox = ttk.Combobox(self, values=color_list, width=7)
+        self.fill_color_cbox.set("red")
+        self.fill_color_cbox.grid(column=0, row=0, padx=5, pady=5)
+
+        self.outline_color_cbox = ttk.Combobox(self, values=color_list, width=7)
+        self.outline_color_cbox.set("black")
+        self.outline_color_cbox.grid(column=0, row=1, padx=5, pady=5)
+
+        self.fill_color_sample = Label(self, width=2, height=1, bg='red', relief="ridge")
+        self.fill_color_sample.grid(column=1, row=0, padx=5, pady=5)
+        self.outline_color_sample = Label(self, width=2, height=1, bg='black', relief="ridge")
+        self.outline_color_sample.grid(column=1, row=1, padx=5, pady=5)
+
+        # https://stackoverflow.com/questions/40641130/how-to-use-a-comboboxselected-virtual-event-with-tkinter
+        self.fill_color_cbox.bind("<<ComboboxSelected>>",
+                                  lambda _: self.color_callback(color_selection=self.fill_color_cbox.get(), sample_box=self.fill_color_sample))
+        self.outline_color_cbox.bind("<<ComboboxSelected>>",
+                                     lambda _: self.color_callback(color_selection=self.outline_color_cbox.get(), sample_box=self.outline_color_sample))
+
+
+        self.line_width_StrVar = StringVar(value='1')
+        self.line_width_entry = Entry(self, validate="all", validatecommand=(self.register(callback_float), '%P'), textvariable=self.line_width_StrVar, width=5)
+        self.line_width_entry.grid(column=2, row=1)
+        self.line_width_StrVar.trace('w', callback=lambda a, b, c: self.line_width_callback(self.line_width_StrVar.get()))
+
+    def color_callback(self, color_selection, sample_box):
+        # print(eventObject)
+        print(color_selection)
+        sample_box.configure(bg=color_selection)
+
+        # I would prefer to have the following be specified as an input, but I don't know how to point to the specific var
+        # So instead, I'll write to both on every call of the function
+        ShapeConfig.fill_color = self.fill_color_cbox.get()
+        ShapeConfig.outline_color = self.outline_color_cbox.get()
+
+    def line_width_callback(self, line_width):
+        print('line width =', line_width)
+        ShapeConfig.line_width = line_width
+
+
+
 # https://stackoverflow.com/questions/22835289/how-to-get-tkinter-canvas-to-dynamically-resize-to-window-width
 class ResizingCanvas(Canvas):
     def __init__(self, parent, **kwargs):
@@ -96,7 +164,7 @@ class ResizingCanvas(Canvas):
         # print('resize = ', self.width, self.height)
 
     def on_left_click(self, event):
-        selected = self.find_overlapping(event.x-2, event.y-2, event.x+2, event.y+2)
+        selected = self.find_overlapping(event.x - 2, event.y - 2, event.x + 2, event.y + 2)
         self.selected_item = ()
         self.startxy = (event.x, event.y)
         self.start_shape = self.startxy
@@ -109,16 +177,14 @@ class ResizingCanvas(Canvas):
             #     self.selected_canvas = True
             print(selected)
         elif ToolSelection.selected == "line":
-            self.temp_shape = self.create_line((self.startxy[0], self.startxy[1]), (self.startxy[0], self.startxy[1]), fill='black')
+            self.temp_shape = self.create_line((self.startxy[0], self.startxy[1]), (self.startxy[0], self.startxy[1]),
+                                               fill=ShapeConfig.fill_color, width=ShapeConfig.line_width)
         elif ToolSelection.selected == "rectangle":
-            self.temp_shape = self.create_rectangle((self.startxy[0], self.startxy[1]), (self.startxy[0], self.startxy[1]), fill='blue')
+            self.temp_shape = self.create_rectangle((self.startxy[0], self.startxy[1]), (self.startxy[0], self.startxy[1]),
+                                                    fill=ShapeConfig.fill_color, width=ShapeConfig.line_width, outline=ShapeConfig.outline_color)
         elif ToolSelection.selected == "oval":
-            self.temp_shape = self.create_oval((self.startxy[0], self.startxy[1]), (self.startxy[0], self.startxy[1]), fill='red')
-        else:
-            self.selected_item = None
-            # self.selected_canvas = False
-            print("DRAW")
-        # self.itemconfig(self.text_obj, text=ToolSelection.selected)
+            self.temp_shape = self.create_oval((self.startxy[0], self.startxy[1]), (self.startxy[0], self.startxy[1]),
+                                               fill=ShapeConfig.fill_color, width=ShapeConfig.line_width, outline=ShapeConfig.outline_color)
 
     def on_right_click(self, event):
         print("Right Click", event)
@@ -134,11 +200,11 @@ class ResizingCanvas(Canvas):
         self.startxy = (event.x, event.y)
 
     def on_scale(self, event):
-        print((event.delta/120)*0.1)
+        print((event.delta / 120) * 0.1)
 
         # wscale = float(event.width)/self.width
         # hscale = float(event.height)/self.height
-        scale = 1 + (event.delta/120)*0.1
+        scale = 1 + (event.delta / 120) * 0.1
         # self.width = event.width
         # self.height = event.height
         # resize the canvas
@@ -179,7 +245,7 @@ class SimulationApp(Tk):
         self.control_frame.grid(row=0, column=1, padx=10, pady=10, sticky="WE")
 
         # >>> Canvas Frame <<<
-        self.my_canvas = ResizingCanvas(self.visual_frame)#, self.tool_selection_frame)
+        self.my_canvas = ResizingCanvas(self.visual_frame)  #, self.tool_selection_frame)
         # self.my_canvas.config(bg=transparent_color)
         self.my_canvas.pack(fill=BOTH, expand=YES)
 
@@ -207,6 +273,7 @@ class SimulationApp(Tk):
         self.tool_selection_frame = ToolSelection(self.control_frame, bg='orange', canvas_label=self.canvas_tool_lbl)
         self.tool_selection_frame.grid(row=3, column=0, columnspan=4, sticky=W + E)
 
+        self.color_selection_frame = ShapeConfig(self.control_frame)
 
         #--------------------------------------------------------------------------------------------
         # self.canvas_lbl_str = StringVar(value="Mouse")
@@ -219,7 +286,7 @@ class SimulationApp(Tk):
         self.my_canvas.create_oval((50, 50), (100, 100), fill='red')
         # radius of the circle is 25. A^2 + B^2 = C^2 and A = B so 2 * A^2 = C^2
         # A = SQRT(C^2 / 2) = 17.67767. Rounded up to 18
-        self.my_canvas.create_line((75+18, 75+18), (150, 150), fill='black')
+        self.my_canvas.create_line((75 + 18, 75 + 18), (150, 150), fill='black')
         self.my_canvas.create_rectangle((150, 150), (200, 200), fill='blue')
         self.my_canvas.addtag_all("all")
 
@@ -227,9 +294,6 @@ class SimulationApp(Tk):
         # self.canvas.pack(fill=BOTH, expand=YES)
         #
         # self.canvas.create_oval((50, 50), (100, 100), fill='red')
-
-
-
 
     def clicked_first(self):
         print('clicked first')
@@ -247,10 +311,10 @@ class SimulationApp(Tk):
 
         canvas_center = [self.my_canvas.width / 2, self.my_canvas.height / 2]
 
-        dx, dy = (canvas_center[0] - leftmost_obj - objects_center[0]), (canvas_center[1] - topmost_obj - objects_center[1])
+        dx, dy = (canvas_center[0] - leftmost_obj - objects_center[0]), (
+                    canvas_center[1] - topmost_obj - objects_center[1])
 
         self.my_canvas.move("all", dx, dy)
-
 
 
 if __name__ == "__main__":
